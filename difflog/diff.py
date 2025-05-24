@@ -1,205 +1,348 @@
 """
 The diffing mechanism for API members.
 """
+
+import ast
 from dataclasses import dataclass
-import logging
-from typing import Generator, Any
-
 from deepdiff import DeepDiff, Delta
+import logging
 
-from members import Member, Argument, Namespace, FunctionMember, AttributeMember
+from api_members import ModuleMember, ApiMember
+from typing import Any
+
 
 @dataclass
-class Change:
+class ApiChange:
     """
-    Base class for all changes.
+    Base class for API changes.
     """
+    path: str
+    name: str
+
 
 @dataclass
-class Added(Change):
-    value: Member | Argument
+class Added(ApiChange):
+    """
+    Added API member.
+    """
+    type_name: str
+
 
 @dataclass
-class Removed(Change):
-    value: Member | Argument
+class Removed(ApiChange):
+    """
+    Removed API member.
+    """
+    type_name: str
+
 
 @dataclass
-class Modified(Change):
-    old_obj: Member | Argument
-    new_obj: Member | Argument
-    descriptor: str
-    old_value: Any
-    new_value: Any
+class TypeChanged(ApiChange):
+    """
+    API member's type changed.
+    """
+    from_type: str
+    to_type: str
+
 
 @dataclass
-class DecoratorAdded(Change):
-    old_parent: FunctionMember | Namespace
-    new_parent: FunctionMember | Namespace
-    decorator: str
+class Modified(ApiChange):
+    """
+    Some property of the API member changed.
+    """
+    type_name: str
+    prop: str
+    from_value: Any
+    to_value: Any
+
+
+@dataclass
+class AddedClassBase(ApiChange):
+    """
+    Added base class to a class.
+    """
+    value: str
     position: int
 
+
 @dataclass
-class DecoratorRemoved(Change):
-    old_parent: FunctionMember | Namespace
-    new_parent: FunctionMember | Namespace 
-    decorator: str
+class RemovedClassBase(ApiChange):
+    """
+    Removed base class from a class.
+    """
+    value: str
     position: int
 
+
 @dataclass
-class DecoratorModified(Change):
-    old_parent: FunctionMember | Namespace
-    new_parent: FunctionMember | Namespace
-    old_decorator: str
-    new_decorator: str
+class ModifiedClassBase(ApiChange):
+    """
+    Modified base class of a class.
+    """
+    position: int
+    from_value: str
+    to_value: str
+
+
+@dataclass
+class AddedDecorator(ApiChange):
+    """
+    Added decorator to a function or class.
+    """
+    type_name: str
+    value: str
     position: int
 
-@dataclass
-class AsyncModified(Change):
-    old_parent: FunctionMember
-    new_parent: FunctionMember
-    old_is_async: bool
-    new_is_async: bool
 
 @dataclass
-class ArgumentPositionModified(Change):
-    old_parent: FunctionMember
-    new_parent: FunctionMember
-    old_position: int
-    new_position: int
+class RemovedDecorator(ApiChange):
+    """
+    Removed decorator from a function or class.
+    """
+    type_name: str
+    value: str
+    position: int
 
-@dataclass 
-class ReturnsModified(Change):
-    old_parent: FunctionMember
-    new_parent: FunctionMember
-    old_returns: str
-    new_returns: str
 
 @dataclass
-class NoAlikeClasses(Change):
-    old_ns: Namespace
-    new_ns: Namespace
+class ModifiedDecorator(ApiChange):
+    """
+    Modified decorator of a function or class.
+    """
+    type_name: str
+    position: int
+    from_value: str
+    to_value: str
 
-@dataclass
-class NoAlikeFunctions(Change):
-    old_ns: Namespace
-    new_ns: Namespace
 
-@dataclass
-class NoAlikeAttributes(Change):
-    old_ns: Namespace
-    new_ns: Namespace
-
-@dataclass
-class AnnotationModified(Change):
-    old_parent: Member | Argument
-    new_parent: Member | Argument
-    old_annotation: str
-    new_annotation: str
-
-@dataclass
-class AssignmentValueModified(Change):
-    old_parent: AttributeMember
-    new_parent: AttributeMember
-    old_value: str
-    new_value: str
-
-@dataclass
-class DefaultModified(Change):
-    old_parent: Argument
-    new_parent: Argument
-    old_default: str
-    new_default: str
-
-def _get_from_ns(ns: Namespace, path: tuple[str]):
+def _get_member_from_path(module: ModuleMember, path: list[str]) -> ApiMember:
+    """
+    Get the last member from a path. This is essentially a single linked list traversal.
+    """
+    last_member = module
     for name in path:
-        ns = ns[name]
-    return ns
+        module = module[name]
+        if isinstance(module, ApiMember):
+            last_member = module
+    return last_member
 
-def diff(old_module: Namespace, new_module: Namespace) -> Generator[Change, None, None]:
-    rows = Delta(DeepDiff(old_module, new_module, exclude_regex_paths=r".*\.(?:lineno|end_lineno|path)$"), bidirectional=True).to_flat_rows(report_type_changes=False)
-    for row in rows:
-        if row.action == "dictionary_item_added":
-            yield Added(row.value)
-        elif row.action == "dictionary_item_removed":
-            yield Removed(row.value)
-        elif row.action == "values_changed" and row.path == ["classes"]:
-            yield NoAlikeClasses(old_module, new_module)
-        elif row.action == "values_changed" and row.path == ["functions"]:
-            yield NoAlikeFunctions(old_module, new_module)
-        elif row.action == "values_changed" and row.path == ["attributes"]:
-            yield NoAlikeAttributes(old_module, new_module)
-        elif row.action == "values_changed" and row.path[-2] == "decorators":
-            parent = row.path[:-2]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield DecoratorModified(old_terminal, new_terminal, row.old_value, row.value, row.path[-1])
-        elif row.action == "values_changed" and row.path[-1] == "is_async":
-            parent = row.path[:-1]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield AsyncModified(old_terminal, new_terminal, row.old_value, row.value)
-        elif row.action == "values_changed" and row.path[-1] == "position":
-            parent = row.path[:-1]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield ArgumentPositionModified(old_terminal, new_terminal, row.old_value, row.value)
-        elif row.action == "values_changed" and row.path[-1] == "returns":
-            parent = row.path[:-1]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield ReturnsModified(old_terminal, new_terminal, row.old_value, row.value)
-        elif row.action == "values_changed" and row.path[-1] == "annotation":
-            parent = row.path[:-1]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield AnnotationModified(old_terminal, new_terminal, row.old_value, row.value)
-        elif row.action == "values_changed" and row.path[-1] == "value":
-            parent = row.path[:-1]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield AssignmentValueModified(old_terminal, new_terminal, row.old_value, row.value)
-        elif row.action == "values_changed" and row.path[-1] == "default":
-            parent = row.path[:-1]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield DefaultModified(old_terminal, new_terminal, row.old_value, row.value)
-        elif row.action == "values_changed":
-            parent = row.path[:-1]
-            old_terminal = _get_from_ns(old_module, parent)
-            new_terminal = _get_from_ns(new_module, parent)
-            yield Modified(old_terminal, new_terminal, row.path[-1], row.old_value, row.value)
-        elif row.action == "iterable_item_added" and row.path[-2] == "decorators":
-            parent = row.path[:-2]
-            yield DecoratorAdded(_get_from_ns(old_module, parent), _get_from_ns(new_module, parent), row.value, row.path[-1])
-        elif row.action == "iterable_item_removed" and row.path[-2] == "decorators":
-            parent = row.path[:-2]
-            yield DecoratorRemoved(_get_from_ns(old_module, parent), _get_from_ns(new_module, parent), row.value, row.path[-1])
+
+def diff(
+    old_module: ModuleMember | ast.Module | str,
+    new_module: ModuleMember | ast.Module | str,
+) -> list[ApiChange]:
+    """
+    List the API changes between two modules.
+
+    Args:
+        old_module: The old module.
+        new_module: The new module.
+
+    Returns:
+        A list of changes.
+    """
+    if isinstance(old_module, str):
+        old_module = ModuleMember(node=ast.parse(old_module))
+    elif isinstance(old_module, ast.Module):
+        old_module = ModuleMember(node=old_module)
+    if isinstance(new_module, str):
+        new_module = ModuleMember(node=ast.parse(new_module))
+    elif isinstance(new_module, ast.Module):
+        new_module = ModuleMember(node=new_module)
+
+    output = []
+
+    for row in Delta(
+        DeepDiff(old_module, new_module, exclude_regex_paths=r".*\.(?:node|path)"),
+        bidirectional=True,
+    ).to_flat_rows():
+        if row.action == "dictionary_item_added" and isinstance(row.value, ApiMember):
+            output.append(
+                Added(
+                    path=".".join(row.value.path[:-1]),
+                    name=row.value.path[-1],
+                    type_name=row.value.type_name,
+                )
+            )
+        elif row.action == "dictionary_item_removed" and isinstance(
+            row.value, ApiMember
+        ):
+            output.append(
+                Removed(
+                    path=".".join(row.value.path[:-1]),
+                    name=row.value.path[-1],
+                    type_name=row.value.type_name,
+                )
+            )
+        elif row.action == "type_changes" and isinstance(row.value, ApiMember):
+            output.append(
+                TypeChanged(
+                    path=".".join(row.value.path[:-1]),
+                    name=row.value.path[-1],
+                    from_type=row.old_value.type_name,  # type: ignore
+                    to_type=row.value.type_name,
+                )
+            )
+        elif row.action == "values_changed" and len(row.path) == 1:
+            # There are no common API members between the old and new modules, so
+            # all old members are removed and all new members are added.
+            for member in old_module.members.values():
+                output.append(
+                    Removed(
+                        path=".".join(member.path[:-1]),
+                        name=member.path[-1],
+                        type_name=member.type_name,
+                    )
+                )
+            for member in new_module.members.values():
+                output.append(
+                    Added(
+                        path=".".join(member.path[:-1]),
+                        name=member.path[-1],
+                        type_name=member.type_name,
+                    )
+                )
+        elif (
+            row.action == "values_changed"
+            and len(row.path) > 1
+            and row.path[-2] == "bases"
+        ):
+            obj = _get_member_from_path(old_module, row.path[:-1])
+            output.append(
+                ModifiedClassBase(
+                    path=".".join(obj.path[:-1]),
+                    name=obj.path[-1],
+                    position=row.path[-1],
+                    from_value=row.old_value,  # type: ignore
+                    to_value=row.value,  # type: ignore
+                )
+            )
+        elif (
+            row.action == "values_changed"
+            and len(row.path) > 1
+            and row.path[-2] == "decorators"
+        ):
+            obj = _get_member_from_path(old_module, row.path[:-1])
+            output.append(
+                ModifiedDecorator(
+                    path=".".join(obj.path[:-1]),
+                    name=obj.path[-1],
+                    type_name=obj.type_name,
+                    position=row.path[-1],
+                    from_value=row.old_value,  # type: ignore
+                    to_value=row.value,  # type: ignore
+                )
+            )
+        elif row.action == "values_changed" and len(row.path) > 1:
+            obj = _get_member_from_path(old_module, row.path[:-1])
+            output.append(
+                Modified(
+                    path=".".join(obj.path[:-1]),
+                    name=obj.path[-1],
+                    type_name=obj.type_name,
+                    prop=row.path[-1],
+                    from_value=row.old_value,
+                    to_value=row.value,
+                )
+            )
+        elif (
+            row.action == "iterable_item_added"
+            and len(row.path) > 1
+            and row.path[-2] == "decorators"
+        ):
+            obj = _get_member_from_path(old_module, row.path[:-1])
+            output.append(
+                AddedDecorator(
+                    path=".".join(obj.path[:-1]),
+                    name=obj.path[-1],
+                    type_name=obj.type_name,
+                    value=row.value,  # type: ignore
+                    position=row.path[-1],
+                )
+            )
+        elif (
+            row.action == "iterable_item_removed"
+            and len(row.path) > 1
+            and row.path[-2] == "decorators"
+        ):
+            obj = _get_member_from_path(old_module, row.path[:-1])
+            output.append(
+                RemovedDecorator(
+                    path=".".join(obj.path[:-1]),
+                    name=obj.path[-1],
+                    type_name=obj.type_name,
+                    value=row.value,  # type: ignore
+                    position=row.path[-1],
+                )
+            )
+        elif (
+            row.action == "iterable_item_added"
+            and len(row.path) > 1
+            and row.path[-2] == "bases"
+        ):
+            obj = _get_member_from_path(old_module, row.path[:-1])
+            output.append(
+                AddedClassBase(
+                    path=".".join(obj.path[:-1]),
+                    name=obj.path[-1],
+                    value=row.value,  # type: ignore
+                    position=row.path[-1],
+                )
+            )
+        elif (
+            row.action == "iterable_item_removed"
+            and len(row.path) > 1
+            and row.path[-2] == "bases"
+        ):
+            obj = _get_member_from_path(old_module, row.path[:-1])
+            output.append(
+                RemovedClassBase(
+                    path=".".join(obj.path[:-1]),
+                    name=obj.path[-1],
+                    value=row.value,  # type: ignore
+                    position=row.path[-1],
+                )
+            )
         else:
-            logging.error(row)
+            logging.error(f"Unknown change: {row}")
+
+    return output
 
 
 if __name__ == "__main__":
     import ast
+
     script1 = """
+node: int = 2
 x: int = 2
 
+@decorator1
+@decorator2
 def bar(a: int, b: int = 1, *args: int, **kwargs: int) -> str:
     return ""
 
-def foo(start, a: int, /, b: int = 1, *args: int, **kwargs: int) -> str:
-    return ""
-    
+class Foo(metaclass=1):
+    def fun() -> str: pass
 """
     script2 = """
-x: float = 2.0
+def x() -> str: pass
 
+@decorator2
+@decorator1
 def bar(a: int, b: int = 2, *args: int, **kwargs: int) -> str:
     return ""
 
 def foo(start, a: int, /, b: int = 1, *args: int, **kwargs: int) -> str:
     return ""
 
+class Foo:
+    def fun() -> int: pass
 """
-    from pprint import pprint
-    for change in diff(Namespace.from_ast(ast.parse(script1)), Namespace.from_ast(ast.parse(script2))):
+    # from pprint import pprint
+    from pathlib import Path
+
+    for change in diff(
+        ModuleMember(node=ast.parse(Path("io_old.py").read_text())),
+        ModuleMember(node=ast.parse(Path("io_new.py").read_text())),
+    ):
         print(change)
