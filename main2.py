@@ -1,0 +1,1 @@
+def bar(b: int = 2, a: int = 3, *args: int, **kwargs: int) -> str: pass

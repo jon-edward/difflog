@@ -3,6 +3,21 @@ import ast
 from dataclasses import dataclass, field
 from typing import Callable
 
+__all__ = (
+    "ApiMember",
+    "AttributeMember",
+    "FunctionMember",
+    "ClassMember",
+    "ModuleMember",
+    "NamespaceMember",
+    "Argument",
+    "ArgumentVarKeyword",
+    "ArgumentVarPositional",
+    "ArgumentPositionalOnly",
+    "ArgumentPositionalOrKeyword",
+    "ArgumentKeywordOnly",
+)
+
 
 @dataclass
 class ApiMember:
@@ -332,29 +347,3 @@ class ModuleMember(NamespaceMember):
     @property
     def type_name(self):
         return "module"
-
-
-if __name__ == "__main__":
-    from pprint import pprint
-    from textwrap import dedent
-
-    script = dedent(
-        """
-        x: int = 1
-        y: int = 2
-        z: int = 3
-        
-        a: int
-        
-        @decorator_fun
-        def fun(a: int, b: int = 1, *args: int, **kwargs: int) -> str: pass
-        
-        @decorator_class
-        class Foo:
-            x: int
-            
-            def __init__(self, a: int, b: int = 1, *args: int, **kwargs: int): pass
-    """
-    )
-
-    pprint(ModuleMember(node=ast.parse(script)))

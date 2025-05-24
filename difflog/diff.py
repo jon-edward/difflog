@@ -7,112 +7,175 @@ from dataclasses import dataclass
 from deepdiff import DeepDiff, Delta
 import logging
 
-from api_members import ModuleMember, ApiMember
+from parse_api import ModuleMember, ApiMember
 from typing import Any
 
+__all__ = (
+    "diff",
+    "ApiChange",
+    "Added",
+    "Removed",
+    "TypeChanged",
+    "Modified",
+    "AddedClassBase",
+    "RemovedClassBase",
+    "ModifiedClassBase",
+    "AddedDecorator",
+    "RemovedDecorator",
+    "ModifiedDecorator",
+)
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class ApiChange:
     """
     Base class for API changes.
     """
+
     path: str
     name: str
 
+    def _prefix(self, message: str) -> str:
+        prefix = f'[{self.path}] ' if self.path else ''
+        return f"{prefix}{message}"
 
-@dataclass
+    def describe(self) -> str:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True, order=True)
 class Added(ApiChange):
     """
     Added API member.
     """
+
     type_name: str
 
+    def describe(self) -> str:
+        return self._prefix(f"Added `{self.name}`")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class Removed(ApiChange):
     """
     Removed API member.
     """
+
     type_name: str
 
+    def describe(self) -> str:
+        return self._prefix(f"Removed {self.type_name} `{self.name}`")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class TypeChanged(ApiChange):
     """
     API member's type changed.
     """
+
     from_type: str
     to_type: str
 
+    def describe(self) -> str:
+        return self._prefix(f"Changed type of `{self.name}` from {self.from_type} to {self.to_type}")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class Modified(ApiChange):
     """
     Some property of the API member changed.
     """
+
     type_name: str
     prop: str
     from_value: Any
     to_value: Any
 
+    def describe(self) -> str:
+        return self._prefix(f"Changed {self.type_name} `{self.name}` {self.prop} from {'nothing' if self.from_value == '' else self.from_value} to {self.to_value}")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class AddedClassBase(ApiChange):
     """
     Added base class to a class.
     """
+
     value: str
     position: int
 
+    def describe(self) -> str: 
+        return self._prefix(f"Added base class {self.value} to `{self.name}` at position {self.position}")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class RemovedClassBase(ApiChange):
     """
     Removed base class from a class.
     """
+
     value: str
     position: int
 
+    def describe(self) -> str:
+        return self._prefix(f"Removed base class {self.value} from `{self.name}` at position {self.position}")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class ModifiedClassBase(ApiChange):
     """
     Modified base class of a class.
     """
+
     position: int
     from_value: str
     to_value: str
 
+    def describe(self) -> str:
+        return self._prefix(f"Modified base class of `{self.name}` at position {self.position} from {self.from_value} to {self.to_value}")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class AddedDecorator(ApiChange):
     """
     Added decorator to a function or class.
     """
+
     type_name: str
     value: str
     position: int
 
+    def describe(self) -> str:
+        return self._prefix(f"Added decorator {self.value} to {self.type_name} `{self.name}` at position {self.position}")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class RemovedDecorator(ApiChange):
     """
     Removed decorator from a function or class.
     """
+
     type_name: str
     value: str
     position: int
 
+    def describe(self) -> str:
+        return self._prefix(f"Removed decorator {self.value} from {self.type_name} `{self.name}` at position {self.position}")
 
-@dataclass
+
+@dataclass(frozen=True, order=True)
 class ModifiedDecorator(ApiChange):
     """
     Modified decorator of a function or class.
     """
+
     type_name: str
     position: int
     from_value: str
     to_value: str
+
+    def describe(self) -> str:
+        return self._prefix(f"Modified decorator of {self.type_name} `{self.name}` at position {self.position} from {self.from_value} to {self.to_value}")
 
 
 def _get_member_from_path(module: ModuleMember, path: list[str]) -> ApiMember:
@@ -133,13 +196,6 @@ def diff(
 ) -> list[ApiChange]:
     """
     List the API changes between two modules.
-
-    Args:
-        old_module: The old module.
-        new_module: The new module.
-
-    Returns:
-        A list of changes.
     """
     if isinstance(old_module, str):
         old_module = ModuleMember(node=ast.parse(old_module))
@@ -183,10 +239,9 @@ def diff(
                     to_type=row.value.type_name,
                 )
             )
-        elif row.action == "values_changed" and len(row.path) == 1:
-            # There are no common API members between the old and new modules, so
-            # all old members are removed and all new members are added.
-            for member in old_module.members.values():
+        elif row.action == "values_changed" and row.path[-1] == "members" and isinstance(row.value, dict):
+            # There are no common members between a member of the old and new module, remove all old and add all new.
+            for member in row.old_value.values(): # type: ignore
                 output.append(
                     Removed(
                         path=".".join(member.path[:-1]),
@@ -194,7 +249,7 @@ def diff(
                         type_name=member.type_name,
                     )
                 )
-            for member in new_module.members.values():
+            for member in row.value.values():
                 output.append(
                     Added(
                         path=".".join(member.path[:-1]),
@@ -212,7 +267,7 @@ def diff(
                 ModifiedClassBase(
                     path=".".join(obj.path[:-1]),
                     name=obj.path[-1],
-                    position=row.path[-1],
+                    position=row.path[-1],  # type: ignore
                     from_value=row.old_value,  # type: ignore
                     to_value=row.value,  # type: ignore
                 )
@@ -228,7 +283,7 @@ def diff(
                     path=".".join(obj.path[:-1]),
                     name=obj.path[-1],
                     type_name=obj.type_name,
-                    position=row.path[-1],
+                    position=row.path[-1],  # type: ignore
                     from_value=row.old_value,  # type: ignore
                     to_value=row.value,  # type: ignore
                 )
@@ -257,7 +312,7 @@ def diff(
                     name=obj.path[-1],
                     type_name=obj.type_name,
                     value=row.value,  # type: ignore
-                    position=row.path[-1],
+                    position=row.path[-1],  # type: ignore
                 )
             )
         elif (
@@ -272,7 +327,7 @@ def diff(
                     name=obj.path[-1],
                     type_name=obj.type_name,
                     value=row.value,  # type: ignore
-                    position=row.path[-1],
+                    position=row.path[-1],  # type: ignore
                 )
             )
         elif (
@@ -286,7 +341,7 @@ def diff(
                     path=".".join(obj.path[:-1]),
                     name=obj.path[-1],
                     value=row.value,  # type: ignore
-                    position=row.path[-1],
+                    position=row.path[-1],  # type: ignore
                 )
             )
         elif (
@@ -300,49 +355,10 @@ def diff(
                     path=".".join(obj.path[:-1]),
                     name=obj.path[-1],
                     value=row.value,  # type: ignore
-                    position=row.path[-1],
+                    position=row.path[-1],  # type: ignore
                 )
             )
         else:
             logging.error(f"Unknown change: {row}")
 
     return output
-
-
-if __name__ == "__main__":
-    import ast
-
-    script1 = """
-node: int = 2
-x: int = 2
-
-@decorator1
-@decorator2
-def bar(a: int, b: int = 1, *args: int, **kwargs: int) -> str:
-    return ""
-
-class Foo(metaclass=1):
-    def fun() -> str: pass
-"""
-    script2 = """
-def x() -> str: pass
-
-@decorator2
-@decorator1
-def bar(a: int, b: int = 2, *args: int, **kwargs: int) -> str:
-    return ""
-
-def foo(start, a: int, /, b: int = 1, *args: int, **kwargs: int) -> str:
-    return ""
-
-class Foo:
-    def fun() -> int: pass
-"""
-    # from pprint import pprint
-    from pathlib import Path
-
-    for change in diff(
-        ModuleMember(node=ast.parse(Path("io_old.py").read_text())),
-        ModuleMember(node=ast.parse(Path("io_new.py").read_text())),
-    ):
-        print(change)
