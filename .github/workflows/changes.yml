@@ -14,4 +14,4 @@ jobs:
       - name: Install requirements
         run: pip install -r requirements.txt
       - name: Run difflog
-        run: python -m difflog.git_report --from-rev ${{ github.event.before }} --to-rev ${{ github.event.after }} > $GITHUB_STEP_SUMMARY
+        run: python -m difflog.git_report --from-rev ${{ github.event.before }} > $GITHUB_STEP_SUMMARY
