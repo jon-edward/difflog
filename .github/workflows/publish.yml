@@ -1,7 +1,6 @@
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 jobs:
   pypi-publish:
@@ -14,6 +13,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -33,3 +34,18 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Install difflog
+        run: |
+          python -m pip install -e .
+
+      - name: Run difflog
+        id: diff
+        run: echo "CHANGES=$(python -m difflog.git_report --from-rev $(git describe --tags --abbrev=0 HEAD^) --to-rev HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Add Test Report to Release
+        uses: irongut/EditRelease@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          id: ${{ github.event.release.id }}
+          body: ${{ steps.diff.outputs.CHANGES }}
