@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from diff import diff
+from difflog.diff import diff
 
 
 def main():
@@ -12,6 +12,7 @@ def main():
 
     for change in sorted(diff(args.old_file.read_text(), args.new_file.read_text())):
         print(change.describe())
+
 
 if __name__ == "__main__":
     main()

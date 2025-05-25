@@ -1,0 +1,15 @@
+name: Python package
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Run difflog
+        run: python -m difflog.git_report --from-rev ${{ github.event.before }} --to-rev ${{ github.event.after }} > $GITHUB_STEP_SUMMARY
