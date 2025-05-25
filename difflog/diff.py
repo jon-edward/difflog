@@ -26,6 +26,7 @@ __all__ = (
     "ModifiedDecorator",
 )
 
+
 @dataclass(frozen=True, order=True)
 class ApiChange:
     """Base class for API changes."""
@@ -49,7 +50,7 @@ class Added(ApiChange):
     type_name: str
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="+")
-    
+
     def describe(self) -> str:
         return self._prefix(f"Added {self.type_name} `{self.name}`")
 
@@ -61,7 +62,7 @@ class Removed(ApiChange):
     type_name: str
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="-")
-    
+
     def describe(self) -> str:
         return self._prefix(f"Removed {self.type_name} `{self.name}`")
 
@@ -74,9 +75,11 @@ class TypeChanged(ApiChange):
     to_type: str
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="!")
-    
+
     def describe(self) -> str:
-        return self._prefix(f"Changed type of `{self.name}` from {self.from_type} to {self.to_type}")
+        return self._prefix(
+            f"Changed type of `{self.name}` from {self.from_type} to {self.to_type}"
+        )
 
 
 @dataclass(frozen=True, order=True)
@@ -89,9 +92,11 @@ class Modified(ApiChange):
     to_value: Any
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="!")
-    
+
     def describe(self) -> str:
-        return self._prefix(f"Changed {self.type_name} `{self.name}` {self.prop} from {self.from_value} to {self.to_value}")
+        return self._prefix(
+            f"Changed {self.type_name} `{self.name}` {self.prop} from {self.from_value} to {self.to_value}"
+        )
 
 
 @dataclass(frozen=True, order=True)
@@ -102,9 +107,11 @@ class AddedClassBase(ApiChange):
     position: int
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="+")
-    
+
     def describe(self) -> str:
-        return self._prefix(f'Added base class `{self.value}` to `{self.name}` at position {self.position}')
+        return self._prefix(
+            f"Added base class `{self.value}` to `{self.name}` at position {self.position}"
+        )
 
 
 @dataclass(frozen=True, order=True)
@@ -114,11 +121,12 @@ class RemovedClassBase(ApiChange):
     value: str
     position: int
 
-    _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="-")  
-    
+    _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="-")
+
     def describe(self) -> str:
-        return self._prefix(f'Removed base class `{self.value}` from `{self.name}` at position {self.position}')
-    
+        return self._prefix(
+            f"Removed base class `{self.value}` from `{self.name}` at position {self.position}"
+        )
 
 
 @dataclass(frozen=True, order=True)
@@ -130,9 +138,11 @@ class ModifiedClassBase(ApiChange):
     to_value: str
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="!")
-    
+
     def describe(self) -> str:
-        return self._prefix(f"Modified base class of `{self.name}` at position {self.position} from `{self.from_value}` to `{self.to_value}`")
+        return self._prefix(
+            f"Modified base class of `{self.name}` at position {self.position} from `{self.from_value}` to `{self.to_value}`"
+        )
 
 
 @dataclass(frozen=True, order=True)
@@ -144,9 +154,11 @@ class AddedDecorator(ApiChange):
     position: int
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="+")
-    
+
     def describe(self) -> str:
-        return self._prefix(f"Added decorator `{self.value}` to {self.type_name} `{self.name}` at position {self.position}")
+        return self._prefix(
+            f"Added decorator `{self.value}` to {self.type_name} `{self.name}` at position {self.position}"
+        )
 
 
 @dataclass(frozen=True, order=True)
@@ -158,9 +170,11 @@ class RemovedDecorator(ApiChange):
     position: int
 
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="-")
-    
+
     def describe(self) -> str:
-        return self._prefix(f"Removed decorator `{self.value}` from {self.type_name} `{self.name}` at position {self.position}")
+        return self._prefix(
+            f"Removed decorator `{self.value}` from {self.type_name} `{self.name}` at position {self.position}"
+        )
 
 
 @dataclass(frozen=True, order=True)
@@ -175,7 +189,9 @@ class ModifiedDecorator(ApiChange):
     _diff_symbol: Literal["+", "-", "#", "!"] = field(init=False, default="!")
 
     def describe(self) -> str:
-        return self._prefix(f"Modified decorator of `{self.name}` at position {self.position} from `{self.from_value}` to `{self.to_value}`")
+        return self._prefix(
+            f"Modified decorator of `{self.name}` at position {self.position} from `{self.from_value}` to `{self.to_value}`"
+        )
 
 
 def _get_member_from_path(module: ModuleMember, path: list[str]) -> ApiMember:

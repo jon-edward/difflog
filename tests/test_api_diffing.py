@@ -5,7 +5,18 @@ from textwrap import dedent
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.resolve()))
 
-from difflog import *
+from difflog import (
+    diff,
+    Removed,
+    Added,
+    Modified,
+    TypeChanged,
+    RemovedClassBase,
+    AddedClassBase,
+    RemovedDecorator,
+    AddedDecorator,
+    ModifiedDecorator,
+)
 
 
 class TestApiDiffing(TestCase):

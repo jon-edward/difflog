@@ -1,9 +1,6 @@
 name: Python package
 
-on:
-  push:
-    tags-ignore:
-      - "v*"
+on: [push]
 
 jobs:
   test:
@@ -22,6 +19,6 @@ jobs:
       - name: Install pytest
         run: pip install pytest
       - name: Install requirements
-        run: pip install -r requirements.txt
+        run: pip install -e .
       - name: Run tests
         run: pytest

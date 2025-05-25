@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install requirements
-        run: pip install -r requirements.txt
+        run: pip install -e .
       - name: Run difflog
         # Generate a changelog from the last tag to HEAD
         run: python -m difflog.git_report --from-rev $(git describe --tags --abbrev=0 HEAD^) --to-rev HEAD > $GITHUB_STEP_SUMMARY
