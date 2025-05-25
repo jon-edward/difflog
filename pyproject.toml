@@ -10,7 +10,7 @@ dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE",]
 authors = [
     {name = "jon-edward", email = "townsend.jonathan.e@gmail.com"},
 ]
@@ -20,10 +20,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Natural Language :: English",
-    "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX",
-    "Operating System :: POSIX :: Linux",
+    "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -51,12 +48,6 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest",
-]
-
-exe = [
-    "setuptools",
-    "wheel",
-    "build",
 ]
 
 [tool.setuptools]
