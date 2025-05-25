@@ -43,7 +43,9 @@ jobs:
         id: diff
         run: |
           changes="$(python -m difflog.git_report --from-rev $(git describe --tags --abbrev=0 HEAD^) --to-rev HEAD)"
-          echo "changes=$changes" >> $GITHUB_OUTPUT
+          echo "CHANGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$changes" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Add Test Report to Release
         uses: irongut/EditRelease@v1.2.0
