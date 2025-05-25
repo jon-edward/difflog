@@ -1,9 +1,6 @@
 name: Python package
 
-on:
-  push:
-    tags-ignore:
-      - "v*"
+on: [push]
 
 jobs:
   changes:
@@ -19,4 +16,5 @@ jobs:
       - name: Install requirements
         run: pip install -r requirements.txt
       - name: Run difflog
-        run: python -m difflog.git_report --from-rev ${{ github.event.before }} --to-rev ${{ github.event.after }} > $GITHUB_STEP_SUMMARY
+        # Generate a changelog from the last tag to HEAD
+        run: python -m difflog.git_report --from-rev $(git describe --tags --abbrev=0 HEAD^) --to-rev HEAD > $GITHUB_STEP_SUMMARY
