@@ -1,0 +1,80 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0", "wheel>=0.37.1"]
+
+
+[project]
+name = "difflog"
+description = "A static analysis tool for diffing public Python APIs."
+dynamic = ["version"]
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    {name = "jon-edward", email = "townsend.jonathan.e@gmail.com"},
+]
+keywords = ["python", "static analysis", "api diffing"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Natural Language :: English",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+# Required dependencies for install/usage of your package or application
+# If you don't have any dependencies, leave this section empty
+# Format for dependency strings: https://peps.python.org/pep-0508/
+dependencies = [
+    "deepdiff >= 8.5.0",
+]
+
+[project.scripts]
+"difflog" = "difflog.__main__:main"
+"difflog-git-report" = "difflog.git_report:main"
+
+[project.urls]
+"Homepage" = "https://github.com/jon-edward/difflog"
+"Source" = "https://github.com/jon-edward/difflog"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
+exe = [
+    "setuptools",
+    "wheel",
+    "build",
+]
+
+[tool.setuptools]
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+platforms = ["Linux", "Windows", "MacOS"]
+include-package-data = true
+zip-safe = true
+dynamic = {version = {attr = "difflog.__version__"}}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["difflog*"]
+
+# Configuration for pytest
+# https://docs.pytest.org/en/latest/reference/customize.html#pyproject-toml
+[tool.pytest.ini_options]
+testpaths = "tests"  # directory containing your tests
+norecursedirs = [
+    ".vscode",
+    "__pycache__"
+]

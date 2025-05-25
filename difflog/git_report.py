@@ -10,6 +10,8 @@ from typing import Callable
 
 from difflog.diff import ApiChange, diff
 
+__all__ = ("git_report", "md_report")
+
 def _diff_content(changes: list[ApiChange]) -> str:
     return '\n'.join(sorted([change._diff_symbol + ' ' + change.describe() for change in changes]))
 
@@ -17,17 +19,17 @@ def md_report(changes: list[ApiChange] | dict[str, list[ApiChange]]) -> str:
     """
     Generate a Markdown report of API changes.
     """
-    diff_element = "```diff\n"
+    total_content = ''
     if isinstance(changes, dict):
         for name, changes in sorted(changes.items(), key=lambda x: x[0]):
             content = _diff_content(changes).strip()
             if not content:
                 continue
-            diff_element += f"@@ {name} @@\n{content}\n\n"
-        diff_element = f"{diff_element.strip()}\n```"
+            total_content += f"@@ {name} @@\n{content}\n\n"
+        diff_element = f"```diff\n{'# No changes' if not total_content.strip() else total_content.strip()}\n```"
         return diff_element
-            
-    return f"{diff_element}{_diff_content(changes)}\n```"
+    total_content = _diff_content(changes).strip()
+    return f"```diff\n{'# No changes' if not total_content else total_content}\n```"
 
 def _git_changed_files(from_rev: str | None = None, to_rev: str | None = None) -> tuple[str, str | None, list[str]]:
     """
@@ -69,7 +71,7 @@ def git_report(from_rev: str | None = None, to_rev: str | None = None, include_f
     from_rev, to_rev, changed_files = _git_changed_files(from_rev, to_rev)
     return "## API Changes\n" + md_report({file_path: diff(_git_content_from_file(file_path, from_rev), _git_content_from_file(file_path, to_rev)) for file_path in changed_files if include_files(file_path)})
 
-def _main(args: list[str] | None = None):
+def main(args: list[str] | None = None):
     parser = argparse.ArgumentParser(description="Generate a Markdown report of API changes in a git repository.")
     parser.add_argument("--from-rev", "--from", type=str, default=None, help="The revision to compare from (default: last push).")
     parser.add_argument("--to-rev", "--to", type=str, default=None, help="The revision to compare to (default: working directory).")
@@ -77,7 +79,7 @@ def _main(args: list[str] | None = None):
 
     args_dict = vars(parser.parse_args(args))
 
-    return git_report(args_dict["from_rev"], args_dict["to_rev"], lambda x: fnmatch(x, args_dict["files"]))
+    print(git_report(args_dict["from_rev"], args_dict["to_rev"], lambda x: fnmatch(x, args_dict["files"])))
 
 if __name__ == "__main__":
-    print(_main())
+    main()
